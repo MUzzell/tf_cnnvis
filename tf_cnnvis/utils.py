@@ -88,8 +88,15 @@ def parse_tensors_dict(graph, layer_name, value_feed_dict):
 # written results into disk as well as logfile of TensorBoard
 def _write_activation(activations, layer, path_outdir, path_logdir):
     is_success = True
+    images = []
 
     act_shape = activations.shape
+
+    if (len(act_shape) == 5 or len(act_shape) == 3) and act_shape[0] == 1:
+        activations = np.squeeze(activations, axis=0)
+
+    act_shape = activations.shape
+
     if len(act_shape) == 2:
         grid_activations = [np.expand_dims(image_normalization(convert_into_grid(im[:,np.newaxis,np.newaxis,np.newaxis], padding=0)), axis = 0) for im in activations]
     else:
@@ -106,7 +113,12 @@ def _write_activation(activations, layer, path_outdir, path_logdir):
 
         grid_activation_path = os.path.join(path_out, "activations")
         is_success = make_dir(grid_activation_path)
-        imsave(os.path.join(grid_activation_path, "grid_activation.png"), grid_activations[i][0,:,:,0], format = "png")
+        images.append(grid_activations[i][0,:,:,0])
+
+    return is_success, {layer: images}
+
+    '''
+        imsave(os.path.join(grid_activation_path, "grid_activation.png"), images[-1], format = "png")
 
     # write into logfile
     path_log = os.path.join(path_logdir, layer.lower().replace("/", "_"))
@@ -127,7 +139,8 @@ def _write_activation(activations, layer, path_outdir, path_logdir):
             print("Error occured int writting results into log file.")
         finally:
             file_writer.close() # close file writer
-    return is_success
+    return is_success, {layer: images}
+    '''
 def _write_deconv(images, layer, path_outdir, path_logdir):
     is_success = True
 
@@ -217,14 +230,15 @@ def _write_deepdream(images, layer, path_outdir, path_logdir):
     return is_success
 def write_results(results, layer, path_outdir, path_logdir, method):
     is_success = True
+    images = None
 
     if method == "act":
-        is_success = _write_activation(results, layer, path_outdir, path_logdir)
+        is_success, images = _write_activation(results, layer, path_outdir, path_logdir)
     elif method == "deconv":
         is_success = _write_deconv(results, layer, path_outdir, path_logdir)
     elif method == "deepdream":
         is_success = _write_deepdream(results, layer, path_outdir, path_logdir)
-    return is_success
+    return is_success, images
 
 
 # if dir not exits make one

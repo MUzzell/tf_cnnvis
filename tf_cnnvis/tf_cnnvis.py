@@ -161,16 +161,25 @@ def _get_visualization(sess_graph_path, value_feed_dict, input_tensor, layers, p
             if not isinstance(layers, list):
                 layers =[layers]
 
+            images = {}
+
             for layer in layers:
                 if layer != None and layer.lower() not in dict_layer.keys():
-                    is_success = _visualization_by_layer_name(g, value_feed_dict, input_tensor, layer, method, path_logdir, path_outdir)
+                    is_success, layer_images = _visualization_by_layer_name(
+                        g, value_feed_dict, input_tensor, layer, method,
+                        path_logdir, path_outdir)
                 elif layer != None and layer.lower() in dict_layer.keys():
                     layer_type = dict_layer[layer.lower()]
-                    is_success = _visualization_by_layer_type(g, value_feed_dict, input_tensor, layer_type, method, path_logdir, path_outdir)
+                    is_success, layer_images = _visualization_by_layer_type(
+                        g, value_feed_dict, input_tensor, layer_type, method,
+                        path_logdir, path_outdir)
                 else:
                     print("Skipping %s . %s is not valid layer name or layer type" % (layer, layer))
+                    layer_images = {}
 
-    return is_success
+                images.update(layer_images)
+
+    return is_success, images
 
 
 def _graph_import_function(PATH, sess):
@@ -222,10 +231,13 @@ def _visualization_by_layer_type(graph, value_feed_dict, input_tensor, layer_typ
     for i in graph.get_operations():
         if layer_type.lower() == i.type.lower():
             layers.append(i.name)
-
+    images = {}
     for layer in layers:
-        is_success = _visualization_by_layer_name(graph, value_feed_dict, input_tensor, layer, method, path_logdir, path_outdir)
-    return is_success
+        is_success, layer_images = _visualization_by_layer_name(
+            graph, value_feed_dict, input_tensor, layer, method,
+            path_logdir, path_outdir)
+        images.update(layer_images)
+    return is_success, images
 
 def _visualization_by_layer_name(graph, value_feed_dict, input_tensor, layer_name, method, path_logdir, path_outdir):
     """
@@ -300,12 +312,12 @@ def _visualization_by_layer_name(graph, value_feed_dict, input_tensor, layer_nam
     # 	return is_success
 
     if is_deep_dream:
-        is_success = write_results(results, layer_name, path_outdir, path_logdir, method = method)
+        is_success, images = write_results(results, layer_name, path_outdir, path_logdir, method = method)
 
     start += time.time()
     print("Reconstruction Completed for %s layer. Time taken = %f s" % (layer_name, start))
 
-    return is_success
+    return is_success, images
 
 
 # computing visualizations
@@ -401,12 +413,17 @@ def _deepdream(graph, sess, op_tensor, X, feed_dict, layer, path_outdir, path_lo
 
 
 # main api methods
-def activation_visualization(sess_graph_path, value_feed_dict, input_tensor = None,  layers = 'r', path_logdir = './Log', path_outdir = "./Output"):
-    is_success = _get_visualization(sess_graph_path, value_feed_dict, input_tensor = input_tensor, layers = layers, method = "act",
-        path_logdir = path_logdir, path_outdir = path_outdir)
-    return is_success
+def activation_visualization(sess_graph_path, value_feed_dict,
+                             input_tensor=None, layers='r',
+                             path_logdir='./Log', path_outdir="./Output"):
+    is_success, images = _get_visualization(sess_graph_path, value_feed_dict,
+                                            input_tensor=input_tensor,
+                                            layers=layers, method="act",
+                                            path_logdir=path_logdir,
+                                            path_outdir=path_outdir)
+    return is_success, images
 def deconv_visualization(sess_graph_path, value_feed_dict, input_tensor = None,  layers = 'r', path_logdir = './Log', path_outdir = "./Output"):
-    is_success = _get_visualization(sess_graph_path, value_feed_dict, input_tensor = input_tensor, layers = layers, method = "deconv",
+    is_success, _ = _get_visualization(sess_graph_path, value_feed_dict, input_tensor = input_tensor, layers = layers, method = "deconv",
         path_logdir = path_logdir, path_outdir = path_outdir)
     return is_success
 
@@ -420,6 +437,6 @@ def deepdream_visualization(sess_graph_path, value_feed_dict, layer, classes, in
     else:
         global units
         units = classes
-        is_success = _get_visualization(sess_graph_path, value_feed_dict, input_tensor = input_tensor, layers = layer, method = "deepdream",
+        is_success, _ = _get_visualization(sess_graph_path, value_feed_dict, input_tensor = input_tensor, layers = layer, method = "deepdream",
             path_logdir = path_logdir, path_outdir = path_outdir)
     return is_success
